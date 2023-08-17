@@ -6,12 +6,24 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
 	ctx := context.Background()
-	server := newServer(9999)
+
+	// TODO: move to env var
+	dbURL := "postgres://user:super-secret@localhost:5432/people?sslmode=disable"
+	port := 9999
+
+	dbPool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Unable to create connection pool")
+	}
+	defer dbPool.Close()
+
+	server := newServer(port, dbPool)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
