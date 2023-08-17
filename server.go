@@ -64,21 +64,19 @@ func writeResponse(w http.ResponseWriter, status int, body string) {
 }
 
 func writeJsonResponse(w http.ResponseWriter, status int, body any) {
+
 	bodyJson, err := json.Marshal(body)
 	if err != nil {
 		log.Err(err).Msg("error marshalling response")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
+	w.WriteHeader(status)
 	_, err = w.Write(bodyJson)
 	if err != nil {
 		log.Err(err).Msg("error writing response")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-	if status != http.StatusOK {
-		w.WriteHeader(status)
 	}
 }
 
