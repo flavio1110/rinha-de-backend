@@ -23,8 +23,8 @@ prepare-commit: lint tests
 	@echo lint and testing passed
 
 .PHONY: compose-up
-zwz-up:
-	@docker-compose -f docker-compose.yml up
+compose-up:
+	@docker-compose -f docker-compose.yml up -d
 
 .PHONY: compose-down
 compose-down:

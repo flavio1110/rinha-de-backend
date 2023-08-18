@@ -35,7 +35,7 @@ func (s *pessoaResource) postPessoa(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if !isNewPessoaValid(pessoa) {
-		writeResponse(w, http.StatusBadRequest, "")
+		writeResponse(w, http.StatusUnprocessableEntity, "")
 		return
 	}
 
@@ -43,7 +43,7 @@ func (s *pessoaResource) postPessoa(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.store.Add(r.Context(), pessoa); err != nil {
 		if errors.Is(err, errAddSkipped) {
-			writeResponse(w, http.StatusBadRequest, "")
+			writeResponse(w, http.StatusUnprocessableEntity, "")
 			return
 		}
 		log.Err(err).Msg("error adding pessoa")
@@ -127,6 +127,14 @@ func isNewPessoaValid(p pessoa) bool {
 	}
 	if p.Nome == "" || len(p.Nome) > 100 {
 		return false
+	}
+
+	if p.Stack != nil {
+		for i := range p.Stack {
+			if len(p.Stack[i]) > 32 {
+				return false
+			}
+		}
 	}
 
 	if _, err := time.Parse("2006-01-02", p.Nascimento); err != nil {

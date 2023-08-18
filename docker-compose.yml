@@ -9,6 +9,11 @@ services:
       POSTGRES_PASSWORD: super-secret
       POSTGRES_DB: people
       PGDATA: /var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: '1.5GB'
     volumes:
       - ./initdb.d:/docker-entrypoint-initdb.d
     ports:

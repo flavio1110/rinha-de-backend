@@ -59,19 +59,19 @@ func Test_Endpoints(t *testing.T) {
 			},
 			"failed duplicated apelido": {
 				body:               `{ "apelido" : "josé", "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
-				expectedStatusCode: 400,
+				expectedStatusCode: 422,
 			},
 			"failed null name": {
 				body:               `{ "apelido" : "josé", "nome" : null, "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
-				expectedStatusCode: 400,
+				expectedStatusCode: 422,
 			},
 			"failed null apelido": {
 				body:               `{ "apelido" : null, "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
-				expectedStatusCode: 400,
+				expectedStatusCode: 422,
 			},
 			"failed null nascimento": {
 				body:               `{ "apelido" : "josé1", "nome" : "José Roberto", "nascimento" : null, "stack" : ["C#", "Node", "Oracle"] }`,
-				expectedStatusCode: 400,
+				expectedStatusCode: 422,
 			},
 			"failed nome as int": {
 				body:               `{ "apelido" : "josé1", "nome" : 123, "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
