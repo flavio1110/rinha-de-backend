@@ -17,13 +17,15 @@ func main() {
 	dbURL := "postgres://user:super-secret@localhost:5432/people?sslmode=disable"
 	port := 9999
 
+	isLocal := os.Getenv("LOCAL_ENV") == "true"
+
 	dbPool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Unable to create connection pool")
 	}
 	defer dbPool.Close()
 
-	server := newServer(port, dbPool)
+	server := newServer(port, dbPool, isLocal)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)

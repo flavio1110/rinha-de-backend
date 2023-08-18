@@ -1,6 +1,6 @@
 .PHONY: RUN
 run:
-	@go run .
+	@./scripts/run.sh
 
 .PHONY: lint
 lint:
@@ -34,5 +34,7 @@ compose-down:
 up-local-dependencies:
 	@docker-compose -f docker-compose.yml up -d postgres
 
-
+.PHONY: build-docker
+build-docker:
+	@./scripts/build-image.sh
 

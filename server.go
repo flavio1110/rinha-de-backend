@@ -15,11 +15,16 @@ type apiServer struct {
 	server http.Server
 }
 
-func newServer(port int, dbPool *pgxpool.Pool) *apiServer {
+func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	r := mux.NewRouter()
+	addr := fmt.Sprintf(":%d", port)
+	if isLocal {
+		addr = fmt.Sprintf("localhost:%d", port)
+	}
+
 	api := &apiServer{
 		server: http.Server{
-			Addr:    fmt.Sprintf("localhost:%d", port),
+			Addr:    addr,
 			Handler: r,
 		},
 	}
@@ -69,7 +74,6 @@ func writeResponse(w http.ResponseWriter, status int, body string) {
 }
 
 func writeJsonResponse(w http.ResponseWriter, status int, body any) {
-
 	bodyJson, err := json.Marshal(body)
 	if err != nil {
 		log.Err(err).Msg("error marshalling response")
