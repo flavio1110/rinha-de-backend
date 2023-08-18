@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,9 +14,11 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// TODO: move to env var
-	dbURL := "postgres://user:super-secret@localhost:5432/people?sslmode=disable"
-	port := 9999
+	dbURL := os.Getenv("DB_URL")
+	port, err := strconv.Atoi(os.Getenv("HTTP_PORT"))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Unable to parse HTTP_PORT %q", os.Getenv("HTTP_PORT"))
+	}
 
 	isLocal := os.Getenv("LOCAL_ENV") == "true"
 

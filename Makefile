@@ -22,12 +22,12 @@ tidy:
 prepare-commit: lint tests
 	@echo lint and testing passed
 
-.PHONY: compose-up
-compose-up:
-	@docker-compose -f docker-compose.yml up -d
+.PHONY: db-up
+db-up:
+	@docker-compose -f docker-compose.yml up -d postgres
 
-.PHONY: compose-down
-compose-down:
+.PHONY: db-down
+db-down:
 	@docker-compose -f docker-compose.yml down
 
 .PHONY: up-deps
@@ -38,3 +38,11 @@ up-local-dependencies:
 build-docker:
 	@./scripts/build-image.sh
 
+.PHONY: compose-up
+compose-up:
+	@./scripts/build-image.sh
+	@docker-compose -f docker-compose.yml up -d
+
+.PHONY: compose-complete-down
+compose-down:
+	@docker-compose -f docker-compose.yml down

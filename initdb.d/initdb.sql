@@ -9,7 +9,7 @@ create table pessoas (
 --       STORED
 );
 
-CREATE unique index ux_uid on pessoas (uid);
+-- CREATE unique index ux_uid on pessoas (uid);
 --CREATE INDEX terms ON pessoas USING GIN (search_content_pt);
 
 --
