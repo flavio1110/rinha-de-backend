@@ -184,8 +184,14 @@ func (p pessoaDBStore) Count(ctx context.Context) (int, error) {
 
 func (p pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
 	var pessoas []pessoa
-	query := "select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack from pessoas where Nome ilike $1;"
-	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%")
+	query := `
+	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
+	   from pessoas 
+	    where Nome ilike $1
+	       or Apelido ilike $1
+	       or $2=ANY(Stack);`
+
+	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%", term)
 	if err != nil {
 		return nil, fmt.Errorf("querying pessoas: %w", err)
 	}
