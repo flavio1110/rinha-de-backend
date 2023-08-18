@@ -30,6 +30,7 @@ func newServer(port int, dbPool *pgxpool.Pool) *apiServer {
 		},
 	}
 	r.Use(setJSONContentType)
+	r.HandleFunc("/status", statusHandler).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.postPessoa).Methods(http.MethodPost)
 	r.HandleFunc("/pessoas/{id}", resource.getPessoa).Methods(http.MethodGet)
 	r.HandleFunc("/contagem-pessoas", resource.countPessoas).Methods(http.MethodGet)
@@ -53,6 +54,10 @@ func (s *apiServer) Stop(ctx context.Context) error {
 		return fmt.Errorf("shutdown server: %w", err)
 	}
 	return nil
+}
+
+func statusHandler(w http.ResponseWriter, req *http.Request) {
+	writeResponse(w, http.StatusOK, "OK")
 }
 
 func writeResponse(w http.ResponseWriter, status int, body string) {
