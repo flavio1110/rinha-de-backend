@@ -38,6 +38,7 @@ func main() {
 }
 
 func start(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
 	dbURL := os.Getenv("DB_URL")
 	port, err := strconv.Atoi(os.Getenv("HTTP_PORT"))
 	if err != nil {
@@ -69,7 +70,7 @@ func start(ctx context.Context) {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err := server.start(); err != nil {
+		if err := server.start(ctx); err != nil {
 			log.Fatal().Err(err).Msg("Start http server")
 		}
 	}()
@@ -77,6 +78,7 @@ func start(ctx context.Context) {
 	log.Info().Msg("Server started - waiting for signal to stop")
 	<-sig
 	log.Info().Msg("Server shutting down")
+	cancel()
 
 	if err := server.Stop(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Stop server")

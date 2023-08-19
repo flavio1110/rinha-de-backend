@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -149,12 +150,14 @@ type pessoaDBStore struct {
 	dbPool       *pgxpool.Pool
 	cacheApelido *cache.Cache
 	cacheByUID   *cache.Cache
+	chPessoa     chan pessoa
 }
 
 func newPessoaDBStore(dbPool *pgxpool.Pool) *pessoaDBStore {
 	c1 := cache.New(5*time.Minute, 10*time.Minute)
 	c2 := cache.New(5*time.Minute, 10*time.Minute)
-	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2}
+	chPessoa := make(chan pessoa, 1000)
+	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2, chPessoa: chPessoa}
 }
 
 func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
@@ -172,11 +175,12 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
 			return errAddSkipped
 		}
 		return fmt.Errorf("inserting pessoa: %w", err)
 	}
-
+	p.chPessoa <- pes
 	p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
 	p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
 
@@ -217,13 +221,10 @@ func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	var pessoas []pessoa
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
-	   from pessoas 
-	    where Nome ilike $1
-	       or Apelido ilike $1
-	       or $2=ANY(Stack)
-	LIMIT 50;`
+	   from pessoas_read 
+	     where search_terms ilike $1 limit 50;`
 
-	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%", term)
+	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%")
 	if err != nil {
 		return nil, fmt.Errorf("querying pessoas: %w", err)
 	}
@@ -241,6 +242,33 @@ func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 		return nil, fmt.Errorf("iterating over pessoas: %w", err)
 	}
 	return pessoas, nil
+}
+
+func (p *pessoaDBStore) syncPessoaRead(ctx context.Context) {
+	insert := `INSERT INTO pessoas_read (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
+    		($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;`
+	log.Info().Msg("sync pessoa read: started")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				log.Err(ctx.Err()).Msg("Sync pessoa read: context done")
+				return
+			case pes, ok := <-p.chPessoa:
+				{
+					if !ok {
+						log.Info().Msg("Sync pessoa read: channel closed")
+						return
+					}
+					terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
+					_, err := p.dbPool.Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
+					if err != nil {
+						log.Err(err).Str("apelido", pes.Apelido).Str("uid", pes.UID.String()).Msg("sync pessoa read")
+					}
+				}
+			}
+		}
+	}()
 }
 
 var errNotFound = errors.New("not found")

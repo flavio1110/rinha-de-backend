@@ -35,6 +35,7 @@ func Test_Endpoints(t *testing.T) {
 	api := newServer(8888, dbPool, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
+	api.dbStore.syncPessoaRead(ctx)
 
 	t.Run("status", func(t *testing.T) {
 		resp, err := ts.Client().Get(ts.URL + "/status")
@@ -120,14 +121,13 @@ func Test_Endpoints(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("%d", len(locations)), string(body))
 	})
 
-	// TODO: make it case insensitive
 	t.Run("search pessoas", func(t *testing.T) {
 		tcs := map[string]struct {
 			term          string
 			expectedCount int
 		}{
 			"stack": {
-				term:          "Node",
+				term:          "node",
 				expectedCount: 1,
 			},
 			"part of nome": {
@@ -141,14 +141,17 @@ func Test_Endpoints(t *testing.T) {
 		}
 		for name, tc := range tcs {
 			t.Run(name, func(t *testing.T) {
-				resp, err := ts.Client().Get(ts.URL + "/pessoas?t=" + tc.term)
-				assert.NoError(t, err)
-				assert.Equal(t, 200, resp.StatusCode)
-				var pessoas []pessoa
-				err = json.NewDecoder(resp.Body).Decode(&pessoas)
-				assert.NoError(t, err)
-				assert.NotNil(t, pessoas)
-				assert.Equal(t, tc.expectedCount, len(pessoas))
+				assert.Eventuallyf(t, func() bool {
+					resp, err := ts.Client().Get(ts.URL + "/pessoas?t=" + tc.term)
+					assert.NoError(t, err)
+					assert.Equal(t, 200, resp.StatusCode)
+					var pessoas []pessoa
+					err = json.NewDecoder(resp.Body).Decode(&pessoas)
+					assert.NoError(t, err)
+					assert.NotNil(t, pessoas)
+					assert.Equal(t, tc.expectedCount, len(pessoas))
+					return tc.expectedCount == len(pessoas)
+				}, 5*time.Second, 1*time.Second, "timeout waiting for search")
 			})
 		}
 	})

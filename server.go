@@ -15,11 +15,11 @@ import (
 )
 
 type apiServer struct {
-	server http.Server
+	server  http.Server
+	dbStore *pessoaDBStore
 }
 
 func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
-
 	r := mux.NewRouter()
 	addr := fmt.Sprintf(":%d", port)
 	if isLocal {
@@ -27,6 +27,7 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	}
 
 	api := &apiServer{
+		dbStore: newPessoaDBStore(dbPool),
 		server: http.Server{
 			Addr:    addr,
 			Handler: r,
@@ -34,7 +35,7 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	}
 
 	resource := pessoaResource{
-		store: newPessoaDBStore(dbPool),
+		store: api.dbStore,
 	}
 	r.Use(setJSONContentType)
 	r.HandleFunc("/status", statusHandler).Methods(http.MethodGet)
@@ -51,9 +52,10 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	return api
 }
 
-func (s *apiServer) start() error {
+func (s *apiServer) start(ctx context.Context) error {
 	log.Info().Msgf("Listening HTTP on address %s", s.server.Addr)
 
+	s.dbStore.syncPessoaRead(ctx)
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("listening HTTP: %w", err)
 	}
