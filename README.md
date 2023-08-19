@@ -1,5 +1,5 @@
 # rinha-de-backend
-[![Lint Build Test](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml)
+[![Lint Build Test](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml)
 
 ## My implementation of "Rinha de backend" challenge. 
 
