@@ -19,7 +19,7 @@ type apiServer struct {
 }
 
 func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
-	
+
 	r := mux.NewRouter()
 	addr := fmt.Sprintf(":%d", port)
 	if isLocal {
@@ -34,9 +34,7 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	}
 
 	resource := pessoaResource{
-		store: pessoaDBStore{
-			dbPool: dbPool,
-		},
+		store: newPessoaDBStore(dbPool),
 	}
 	r.Use(setJSONContentType)
 	r.HandleFunc("/status", statusHandler).Methods(http.MethodGet)

@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
 )
 
@@ -145,10 +146,23 @@ func isNewPessoaValid(p pessoa) bool {
 }
 
 type pessoaDBStore struct {
-	dbPool *pgxpool.Pool
+	dbPool       *pgxpool.Pool
+	cacheApelido *cache.Cache
+	cacheByUID   *cache.Cache
 }
 
-func (p pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
+func newPessoaDBStore(dbPool *pgxpool.Pool) *pessoaDBStore {
+	c1 := cache.New(5*time.Minute, 10*time.Minute)
+	c2 := cache.New(5*time.Minute, 10*time.Minute)
+	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2}
+}
+
+func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
+	apelidoKey := fmt.Sprintf("apelido:%s", pes.Apelido)
+	if _, found := p.cacheApelido.Get(apelidoKey); found {
+		return errAddSkipped
+	}
+
 	insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack) VALUES
     ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING  returning uid;`
 
@@ -162,10 +176,18 @@ func (p pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 		}
 		return fmt.Errorf("inserting pessoa: %w", err)
 	}
+
+	p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
+	p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
+
 	return nil
 }
 
-func (p pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
+func (p *pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
+	if pes, found := p.cacheByUID.Get(id.String()); found {
+		return pes.(pessoa), nil
+	}
+
 	query := "select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack from pessoas where UID = $1;"
 	var pes pessoa
 	err := p.dbPool.QueryRow(ctx, query, id).
@@ -178,10 +200,11 @@ func (p pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 
 		return pessoa{}, fmt.Errorf("querying pessoa: %w", err)
 	}
+	p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
 	return pes, nil
 }
 
-func (p pessoaDBStore) Count(ctx context.Context) (int, error) {
+func (p *pessoaDBStore) Count(ctx context.Context) (int, error) {
 	var count int
 	err := p.dbPool.QueryRow(ctx, "select count(1) from pessoas;").Scan(&count)
 	if err != nil {
@@ -190,7 +213,7 @@ func (p pessoaDBStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (p pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
+func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
 	var pessoas []pessoa
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
