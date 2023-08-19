@@ -197,7 +197,8 @@ func (p pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error
 	   from pessoas 
 	    where Nome ilike $1
 	       or Apelido ilike $1
-	       or $2=ANY(Stack);`
+	       or $2=ANY(Stack)
+	LIMIT 50;`
 
 	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%", term)
 	if err != nil {

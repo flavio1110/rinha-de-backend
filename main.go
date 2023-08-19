@@ -4,8 +4,11 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime/trace"
 	"strconv"
 	"syscall"
+
+	_ "net/http/pprof"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -13,16 +16,48 @@ import (
 
 func main() {
 	ctx := context.Background()
+	traceEnabled := os.Getenv("TRACE_ENABLED") == "true"
+	if traceEnabled {
 
+		f, err := os.Create("trace.out")
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create trace output file")
+		}
+		defer func() {
+			if err := f.Close(); err != nil {
+				log.Fatal().Err(err).Msg("failed to close trace output file")
+			}
+		}()
+
+		if err := trace.Start(f); err != nil {
+			log.Fatal().Err(err).Msg("failed to start trace")
+		}
+		defer trace.Stop()
+	}
+	start(ctx)
+}
+
+func start(ctx context.Context) {
 	dbURL := os.Getenv("DB_URL")
 	port, err := strconv.Atoi(os.Getenv("HTTP_PORT"))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Unable to parse HTTP_PORT %q", os.Getenv("HTTP_PORT"))
 	}
 
+	maxConnections, err := strconv.Atoi(os.Getenv("DB_MAX_CONNECTIONS"))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Unable to parse DB_MAX_CONNECTIONS %q", os.Getenv("DB_MAX_CONNECTIONS"))
+	}
+
 	isLocal := os.Getenv("LOCAL_ENV") == "true"
 
-	dbPool, err := pgxpool.New(context.Background(), dbURL)
+	config, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Unable to parse config")
+	}
+	config.MaxConns = int32(maxConnections)
+
+	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Unable to create connection pool")
 	}

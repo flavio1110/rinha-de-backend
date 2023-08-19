@@ -32,7 +32,7 @@ func Test_Endpoints(t *testing.T) {
 	defer dbPool.Close()
 	migrateDB(ctx, dbPool)
 
-	api := newServer(8888, dbPool)
+	api := newServer(8888, dbPool, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
 

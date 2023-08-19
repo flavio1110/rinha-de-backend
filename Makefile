@@ -26,12 +26,12 @@ prepare-commit: lint tests
 db-up:
 	@docker-compose -f docker-compose.yml up -d postgres
 
-.PHONY: db-down
-db-down:
+.PHONY: down-deps
+down-deps:
 	@docker-compose -f docker-compose.yml down
 
 .PHONY: up-deps
-up-local-dependencies:
+up-deps:
 	@docker-compose -f docker-compose.yml up -d postgres
 
 .PHONY: build-docker

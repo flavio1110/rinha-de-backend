@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
+
+	_ "net/http/pprof"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +19,7 @@ type apiServer struct {
 }
 
 func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
+	
 	r := mux.NewRouter()
 	addr := fmt.Sprintf(":%d", port)
 	if isLocal {
@@ -41,6 +45,11 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	r.HandleFunc("/contagem-pessoas", resource.countPessoas).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.searchPessoas).Methods(http.MethodGet)
 
+	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 	return api
 }
 
