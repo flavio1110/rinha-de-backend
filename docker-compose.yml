@@ -45,6 +45,7 @@ services:
         limits:
           cpus: '0.25'
           memory: '0.5GB'
+    command: curl -v "http://localhost:8081/contagem-pessoas"
   api2: # API - Instância 01
     image: flavio1110/rinha-backend:local
     hostname: api2
@@ -65,6 +66,7 @@ services:
         limits:
           cpus: '0.25'
           memory: '0.5GB'
+    command: curl -v "http://localhost:8082/contagem-pessoas"
   nginx: # Load Balancer
     image: nginx:latest
     volumes:
