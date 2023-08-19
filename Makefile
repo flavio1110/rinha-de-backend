@@ -4,7 +4,7 @@ run:
 
 .PHONY: lint
 lint:
-	@gofmt -w .
+	@golangci-lint run --fix
 
 .PHONY: tests
 tests:
