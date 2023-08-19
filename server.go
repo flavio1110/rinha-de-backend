@@ -9,6 +9,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -37,6 +38,7 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	resource := pessoaResource{
 		store: api.dbStore,
 	}
+	r.Use(handlers.RecoveryHandler())
 	r.Use(setJSONContentType)
 	r.HandleFunc("/status", statusHandler).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.postPessoa).Methods(http.MethodPost)
