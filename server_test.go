@@ -30,7 +30,8 @@ func Test_Endpoints(t *testing.T) {
 	dbPool, err := pgxpool.New(context.Background(), connString)
 	require.NoError(t, err)
 	defer dbPool.Close()
-	migrateDB(ctx, dbPool)
+	err = migrateDB(ctx, dbPool)
+	require.NoError(t, err)
 
 	api := newServer(8888, dbPool, true)
 	ts := httptest.NewServer(api.server.Handler)
@@ -223,8 +224,4 @@ func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to migrate DB: %w", err)
 	}
 	return nil
-}
-
-func strPtr(v string) *string {
-	return &v
 }

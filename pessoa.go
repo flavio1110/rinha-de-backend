@@ -175,14 +175,16 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
+			// discarding error because we don't want to retry
+			_ = p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
 			return errAddSkipped
 		}
 		return fmt.Errorf("inserting pessoa: %w", err)
 	}
 	p.chPessoa <- pes
-	p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
-	p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
+	// discarding error because we don't want to retry
+	_ = p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
+	_ = p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
 
 	return nil
 }
@@ -204,7 +206,8 @@ func (p *pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 
 		return pessoa{}, fmt.Errorf("querying pessoa: %w", err)
 	}
-	p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
+	// discarding error because we don't want to retry
+	_ = p.cacheByUID.Add(pes.UID.String(), pes, cache.DefaultExpiration)
 	return pes, nil
 }
 
