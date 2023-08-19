@@ -47,45 +47,51 @@ func Test_Endpoints(t *testing.T) {
 	var locations []string
 
 	t.Run("create person", func(t *testing.T) {
-		tcs := map[string]struct {
-			body               string
-			expectedStatusCode int
-		}{
-			"success with stack": {
+
+		tcs := []tcAdd{
+			{
+				name:               "success with stack",
 				body:               `{ "apelido" : "josé", "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 201,
 			},
-			"success without stack": {
+			{
+				name:               "success without stack",
 				body:               `{ "apelido" : "ana", "nome" : "Ana Barbosa", "nascimento" : "1985-09-23", "stack" : null }`,
 				expectedStatusCode: 201,
 			},
-			"failed duplicated apelido": {
+			{
+				name:               "failed duplicated apelido",
 				body:               `{ "apelido" : "josé", "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 422,
 			},
-			"failed null name": {
+			{
+				name:               "failed null name",
 				body:               `{ "apelido" : "josé", "nome" : null, "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 422,
 			},
-			"failed null apelido": {
+			{
+				name:               "failed null apelido",
 				body:               `{ "apelido" : null, "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 422,
 			},
-			"failed null nascimento": {
+			{
+				name:               "failed null nascimento",
 				body:               `{ "apelido" : "josé1", "nome" : "José Roberto", "nascimento" : null, "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 422,
 			},
-			"failed nome as int": {
+			{
+				name:               "failed nome as int",
 				body:               `{ "apelido" : "josé1", "nome" : 123, "nascimento" : "2000-10-01", "stack" : ["C#", "Node", "Oracle"] }`,
 				expectedStatusCode: 400,
 			},
-			"failed stack item as int": {
+			{
+				name:               "failed stack item as int",
 				body:               `{ "apelido" : "josé1", "nome" : "José Roberto", "nascimento" : "2000-10-01", "stack" : ["C#", 123, "Oracle"] }`,
 				expectedStatusCode: 400,
 			},
 		}
-		for name, tc := range tcs {
-			t.Run(name, func(t *testing.T) {
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
 				resp, err := ts.Client().Post(ts.URL+"/pessoas", "application/json", strings.NewReader(tc.body))
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedStatusCode, resp.StatusCode)
@@ -224,4 +230,10 @@ func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to migrate DB: %w", err)
 	}
 	return nil
+}
+
+type tcAdd struct {
+	name               string
+	body               string
+	expectedStatusCode int
 }
