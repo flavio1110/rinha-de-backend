@@ -15,10 +15,7 @@
 - [Gatling](https://gatling.io/)
 
 ## Results
-You can see the evolution on the "results" folder.
-e.g.
-
-![2023-08-19 at 15.45.29 - increase worker connections on nginx.png](results%2F2023-08-19%20at%2015.45.29%20-%20increase%20worker%20connections%20on%20nginx.png)
+The load tests are executed on [CI](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml) and results are published in Github Pages and can be seen [here as an example](https://fsilva.me/rinha-de-backend/rinhabackendsimulation-20230820170604710).
 
 ## How to run
 ```
