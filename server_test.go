@@ -220,7 +220,7 @@ func startTestDB(ctx context.Context) (string, func(t *testing.T), error) {
 }
 
 func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
-	initContent, err := os.ReadFile("initdb.d/initdb.sql")
+	initContent, err := os.ReadFile("initdb.sql")
 	if err != nil {
 		log.Fatal("read init DB file: ", err)
 	}
