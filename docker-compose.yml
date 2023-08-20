@@ -13,7 +13,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
+          cpus: '0.9'
           memory: '1.5GB'
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
@@ -24,7 +24,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    command: postgres -c 'max_connections=250'
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=250"
+      - "-c"
+      - "shared_buffers=256MB"
   api1: # API - Instância 01
     image: flavio1110/rinha-backend:local
     hostname: api1
@@ -43,7 +48,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.2'
           memory: '0.5GB'
     command: curl -v "http://localhost:8081/contagem-pessoas"
   api2: # API - Instância 01
@@ -64,7 +69,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.2'
           memory: '0.5GB'
     command: curl -v "http://localhost:8082/contagem-pessoas"
   nginx: # Load Balancer
@@ -79,5 +84,5 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.2'
           memory: '0.5GB'
