@@ -29,6 +29,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - name: Debug
+        run: echo "Debugging"
       - name: Checkout
         uses: actions/checkout@v3
       - name: Update index.html
@@ -37,7 +39,7 @@ jobs:
       - name: Replace file in index.html
         uses: bluwy/substitute-string-action@v1
         with:
-          _input-file: 'index.html'
+          _input-file: 'index_template.html'
           _output-file: 'index.html'
           _format-key: '%%links%%'
           files: ${{ steps.dir.outputs.files }}
