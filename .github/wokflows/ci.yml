@@ -31,6 +31,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Update index.html
+        id: dir
+        run: echo "::set-output name=files::$(for d in rinha*/; do echo "<li><a href=\"$d/index.html\">$(echo $d | tr -d '/')</a></li>"; done > link.html)"
+      - name: Replace file in index.html
+        uses: bluwy/substitute-string-action@v1
+        with:
+          _input-file: 'index.html'
+          _output-file: 'index.html'
+          _format-key: '%%links%%'
+          files: ${{ steps.dir.outputs.files }}
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact
@@ -41,13 +51,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
-      - name: Update index.html
-        id: dir
-        run: echo "::set-output name=files::"for d in rinha*/; do echo "<li><a href=\"$d/index.html\">$(echo $d | tr -d '/')</a></li>"; done > link.html
-      - name: Replace file in index.html
-        uses: bluwy/substitute-string-action@v1
-        with:
-          _input-file: 'index.html'
-          _output-file: 'index.html'
-          _format-key: '%%links%%'
-          files: ${{ steps.dir.outputs.files }}
+1
