@@ -7,6 +7,7 @@ import (
 	"runtime/trace"
 	"strconv"
 	"syscall"
+	"time"
 
 	_ "net/http/pprof"
 
@@ -57,6 +58,8 @@ func start(ctx context.Context) {
 		log.Fatal().Err(err).Msg("Unable to parse config")
 	}
 	config.MaxConns = int32(maxConnections)
+	config.MinConns = int32(maxConnections)
+	config.MaxConnIdleTime = time.Minute * 3
 
 	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
