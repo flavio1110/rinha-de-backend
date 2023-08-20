@@ -1,13 +1,10 @@
-package main
+package internal
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/pprof"
-
-	_ "net/http/pprof"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -20,7 +17,7 @@ type apiServer struct {
 	dbStore *pessoaDBStore
 }
 
-func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
+func NewServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	r := mux.NewRouter()
 	addr := fmt.Sprintf(":%d", port)
 	if isLocal {
@@ -45,16 +42,10 @@ func newServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	r.HandleFunc("/pessoas/{id}", resource.getPessoa).Methods(http.MethodGet)
 	r.HandleFunc("/contagem-pessoas", resource.countPessoas).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.searchPessoas).Methods(http.MethodGet)
-
-	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 	return api
 }
 
-func (s *apiServer) start(ctx context.Context) error {
+func (s *apiServer) Start(ctx context.Context) error {
 	log.Info().Msgf("Listening HTTP on address %s", s.server.Addr)
 
 	s.dbStore.syncPessoaRead(ctx)

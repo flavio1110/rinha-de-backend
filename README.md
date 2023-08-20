@@ -7,6 +7,17 @@
 - [Instructions (PT-BR)](https://github.com/zanfranceschi/rinha-de-backend-2023-q3/blob/main/INSTRUCOES.md)
 
 
+Some decisions were made to simplify the challenge, such as:
+- Only using in-memory cache. It's fine for the tested lod, but if it increases and more instances are needed, a distributed cache would be better.
+- Pre allocating all DB connections available for the app. It speeds up the warm-up, but it's not ideal.
+- Missing graceful shutdown for syncing the read table. If the app is killed, the read table will be out of sync.
+- Duplicating the same table with the sole purpose of reading. There are better ways to do it, the idea here is having a write table with just a single PK index, to speed up the writes.
+- No batching of writes of the replica table. Despite adding one by one, we could batch the items and save many DB roudtrips.
+- Not enforcing uniqueness of UUID on the write table. The likelihood of collision is very low, but it's not zero.
+- etc.. :) 
+
+Feel free to explore, fork and send PRs. :) 
+
 ## Stack
 - [Go](https://golang.org/)
 - [PostgreSQL](https://www.postgresql.org/)

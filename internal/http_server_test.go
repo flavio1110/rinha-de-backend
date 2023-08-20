@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func Test_Endpoints(t *testing.T) {
 	err = migrateDB(ctx, dbPool)
 	require.NoError(t, err)
 
-	api := newServer(8888, dbPool, true)
+	api := NewServer(8888, dbPool, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
 	api.dbStore.syncPessoaRead(ctx)
@@ -47,7 +47,6 @@ func Test_Endpoints(t *testing.T) {
 	var locations []string
 
 	t.Run("create person", func(t *testing.T) {
-
 		tcs := []tcAdd{
 			{
 				name:               "success with stack",
@@ -220,7 +219,7 @@ func startTestDB(ctx context.Context) (string, func(t *testing.T), error) {
 }
 
 func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
-	initContent, err := os.ReadFile("initdb.sql")
+	initContent, err := os.ReadFile("../initdb.sql")
 	if err != nil {
 		log.Fatal("read init DB file: ", err)
 	}
