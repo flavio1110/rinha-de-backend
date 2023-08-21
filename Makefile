@@ -41,7 +41,7 @@ build-docker:
 .PHONY: compose-up
 compose-up:
 	@./scripts/build-image.sh
-	@docker-compose -f docker-compose.yml up --wait
+	@docker-compose -f docker-compose.yml up -d
 
 .PHONY: compose-complete-down
 compose-down:
