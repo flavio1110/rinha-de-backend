@@ -50,7 +50,9 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 		return errAddSkipped
 	}
 
-	p.chSyncPessoaRead <- pes
+	go func() {
+		p.chSyncPessoaRead <- pes
+	}()
 
 	// discarding error because we don't want to retry
 	_ = p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)

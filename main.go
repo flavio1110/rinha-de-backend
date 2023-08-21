@@ -44,6 +44,9 @@ func main() {
 		log.Fatal().Err(err).Msg("Unable to create connection pool")
 	}
 	defer dbPool.Close()
+	if err := dbPool.Ping(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Unable to ping database")
+	}
 
 	server := internal.NewServer(port, dbPool, isLocal)
 
