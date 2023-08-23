@@ -17,14 +17,16 @@ type pessoaDBStore struct {
 	dbPool           *pgxpool.Pool
 	cacheApelido     *cache.Cache
 	cacheByUID       *cache.Cache
+	cacheSearch      *cache.Cache
 	chSyncPessoaRead chan pessoa
 }
 
 func newPessoaDBStore(dbPool *pgxpool.Pool) *pessoaDBStore {
 	c1 := cache.New(5*time.Minute, 10*time.Minute)
 	c2 := cache.New(5*time.Minute, 10*time.Minute)
+	c3 := cache.New(30*time.Second, 10*time.Minute)
 	chPessoa := make(chan pessoa, 1000)
-	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2, chSyncPessoaRead: chPessoa}
+	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2, cacheSearch: c3, chSyncPessoaRead: chPessoa}
 }
 
 func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
@@ -93,6 +95,10 @@ func (p *pessoaDBStore) Count(ctx context.Context) (int, error) {
 }
 
 func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
+	if cacheSearch, found := p.cacheSearch.Get(term); found {
+		return cacheSearch.([]pessoa), nil
+	}
+
 	var pessoas []pessoa
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
@@ -116,6 +122,9 @@ func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating over pessoas: %w", err)
 	}
+	// discarding error because we don't want to retry
+	_ = p.cacheSearch.Add(term, pessoas, cache.DefaultExpiration)
+
 	return pessoas, nil
 }
 
