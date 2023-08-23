@@ -13,14 +13,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.9'
-          memory: '1.9GB'
+          cpus: "0.9"
+          memory: "1.9GB"
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d people -U user" ]
+      test: ["CMD-SHELL", "pg_isready -d people -U user"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,6 +30,12 @@ services:
       - "max_connections=250"
       - "-c"
       - "shared_buffers=256MB"
+      - "-c"
+      - "synchronous_commit=off"
+      - "-c"
+      - "fsync=off"
+      - "-c"
+      - "full_page_writes=off"
   api1: # API - Instância 01
     image: flavio1110/rinha-backend:local
     hostname: api1
@@ -45,8 +51,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: '0.5GB'
+          cpus: "0.25"
+          memory: "0.5GB"
     healthcheck:
       test: curl -o /dev/null -s --retry 0 --head http://localhost:8081/contagem-pessoas || exit 1
       interval: 10s
@@ -68,8 +74,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: '0.5GB'
+          cpus: "0.25"
+          memory: "0.5GB"
     healthcheck:
       test: curl -o /dev/null -s --retry 0 --head http://localhost:8082/contagem-pessoas || exit 1
       interval: 10s
@@ -92,8 +98,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.1'
-          memory: '0.1GB'
+          cpus: "0.1"
+          memory: "0.1GB"
     healthcheck:
       test: curl --fail http://localhost:9999/contagem-pessoas
       interval: 5s
