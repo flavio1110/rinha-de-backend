@@ -48,7 +48,6 @@ func NewServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 func (s *apiServer) Start(ctx context.Context) error {
 	log.Info().Msgf("Listening HTTP on address %s", s.server.Addr)
 
-	s.dbStore.syncPessoaRead(ctx)
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("listening HTTP: %w", err)
 	}

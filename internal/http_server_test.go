@@ -36,7 +36,6 @@ func Test_Endpoints(t *testing.T) {
 	api := NewServer(8888, dbPool, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
-	api.dbStore.syncPessoaRead(ctx)
 
 	t.Run("status", func(t *testing.T) {
 		resp, err := ts.Client().Get(ts.URL + "/status")

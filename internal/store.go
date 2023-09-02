@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/patrickmn/go-cache"
-	"github.com/rs/zerolog/log"
 )
 
 type pessoaDBStore struct {
@@ -35,11 +34,12 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 		return errAddSkipped
 	}
 
-	insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack) VALUES
-    ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING  returning uid;`
+	terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
+	insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
+    ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING  returning uid;`
 
 	res, err := p.dbPool.
-		Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack)
+		Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
 
 	if err != nil {
 		return fmt.Errorf("inserting pessoa: %w", err)
@@ -51,10 +51,6 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 		_ = p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
 		return errAddSkipped
 	}
-
-	go func() {
-		p.chSyncPessoaRead <- pes
-	}()
 
 	// discarding error because we don't want to retry
 	_ = p.cacheApelido.Add(apelidoKey, true, cache.DefaultExpiration)
@@ -95,14 +91,10 @@ func (p *pessoaDBStore) Count(ctx context.Context) (int, error) {
 }
 
 func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
-	if cacheSearch, found := p.cacheSearch.Get(term); found {
-		return cacheSearch.([]pessoa), nil
-	}
-
 	var pessoas []pessoa
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
-	   from pessoas_read 
+	   from pessoas
 	     where search_terms ilike $1 limit 50;`
 
 	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%")
@@ -122,36 +114,6 @@ func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating over pessoas: %w", err)
 	}
-	// discarding error because we don't want to retry
-	_ = p.cacheSearch.Add(term, pessoas, cache.DefaultExpiration)
 
 	return pessoas, nil
-}
-
-func (p *pessoaDBStore) syncPessoaRead(ctx context.Context) {
-	insert := `INSERT INTO pessoas_read (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
-    		($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;`
-	log.Info().Msg("sync pessoa read: started")
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				// TODO: add graceful shutdown
-				log.Err(ctx.Err()).Msg("Sync pessoa read: context done")
-				return
-			case pes, ok := <-p.chSyncPessoaRead:
-				{
-					if !ok {
-						log.Info().Msg("Sync pessoa read: channel closed")
-						return
-					}
-					terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
-					_, err := p.dbPool.Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
-					if err != nil {
-						log.Err(err).Str("apelido", pes.Apelido).Str("uid", pes.UID.String()).Msg("sync pessoa read")
-					}
-				}
-			}
-		}
-	}()
 }
