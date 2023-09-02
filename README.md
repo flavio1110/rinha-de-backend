@@ -1,8 +1,11 @@
+#### NB!: This is not the version I submitted to the challenge. You can find that version on the [branch v1](https://github.com/flavio1110/rinha-de-backend/tree/v1).
+
 # rinha-de-backend
 
-[![Lint Build Test](https://github.com/flavio1P110/rinha-de-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml)
+[![Lint Build Test](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/flavio1110/rinha-de-backend/actions/workflows/ci.yml)
 
 ## My implementation of "Rinha de backend" challenge.
+ 
 
 [Check out my blog post about my solution and official results](https://fsilva.me/rinha-de-backend.html).
 
