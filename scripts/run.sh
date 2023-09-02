@@ -4,6 +4,7 @@ export LOCAL_ENV=true
 export HTTP_PORT=9999
 export DB_URL="postgres://user:super-secret@localhost:5432/people?sslmode=disable"
 export DB_MAX_CONNECTIONS=90
+export DB_MIN_CONNECTIONS=5
 export TRACE_ENABLED=true
 export REDIS_ADDR="localhost:6379"
 
