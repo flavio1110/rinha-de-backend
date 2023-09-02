@@ -1,4 +1,4 @@
-name: Lint Build Test
+name: Publish Image
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
   smoke_test:
     name: Smoke test
     runs-on: ubuntu-latest
-    
+
     steps:
       - run: | 
           ls
