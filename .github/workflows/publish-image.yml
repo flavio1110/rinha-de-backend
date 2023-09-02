@@ -40,6 +40,10 @@ jobs:
   build-image:
     name: Build and Publish image
     runs-on: ubuntu-latest
+    needs:
+      - lint
+      - acceptance-tests
+      - smoke_test
     env:
       tag: stable
     steps:
