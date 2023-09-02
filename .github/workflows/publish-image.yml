@@ -29,12 +29,14 @@ jobs:
       - run: make tests
   smoke_test:
     name: Smoke test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    
     steps:
-      - run: make compose-up
-      - name: smoke test
-        run: curl -o /dev/null -s --retry 0 --head http://localhost:9999/contagem-pessoas || exit 1
-      - run: echo "https://${{ github.repository_owner }}.github.io/${{ env.GH_REPO }}/${{ env.GATLING_OUTPUT_FOLDER }}" >> "${GITHUB_STEP_SUMMARY}"
+      - run: | 
+          ls
+          make compose-up
+          curl -o /dev/null -s --retry 0 --head http://localhost:9999/contagem-pessoas || exit 1
+          echo "https://${{ github.repository_owner }}.github.io/${{ env.GH_REPO }}/${{ env.GATLING_OUTPUT_FOLDER }}" >> "${GITHUB_STEP_SUMMARY}"
   login:
     name: Login to Docker Hub
     runs-on: ubuntu-latest
@@ -45,9 +47,11 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
   build-image:
+    name: Build and Publish image
     runs-on: ubuntu-latest
     env:
       tag: stable
     steps:
+      - run: ls
       - run: ./scripts/build-image.sh
 
