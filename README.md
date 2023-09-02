@@ -18,10 +18,9 @@
 
 Some decisions were made to simplify the challenge, such as:
 
-- Only using in-memory cache. It's fine for the tested lod, but if it increases and more instances are needed, a distributed cache would be better.
-  Pre-allocating all DB connections available for the app. It speeds up the warm-up, but it's not ideal.
+
+- Pre-allocating all DB connections available for the app. It speeds up the warm-up, but it's not ideal.
 - Missing graceful shutdown for syncing the read table. If the app is killed, the read table will be out of sync.
-- Duplicating the same table with the sole purpose of reading. There are better ways to do it, the idea here is to have a write table with just a single PK index, to speed up the writes.
 - No batching of writes of the replica table. Despite adding them one by one, we could batch the items and save many DB roundtrips.
 - Not enforcing uniqueness of UUID on the write table. The likelihood of collision is very low, but it's not zero.
 - etc.. :)

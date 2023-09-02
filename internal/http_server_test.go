@@ -251,7 +251,7 @@ func startTestRedis(ctx context.Context) (string, func(t *testing.T), error) {
 			t.Fatalf("failed to terminate container: %s", err.Error())
 		}
 	}
-	return fmt.Sprintf("%s:%s", host, port), terminate, nil
+	return fmt.Sprintf("%s:%d", host, port.Int()), terminate, nil
 }
 
 func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
