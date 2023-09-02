@@ -8,16 +8,14 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
 type apiServer struct {
-	server  http.Server
-	dbStore *pessoaDBStore
+	server http.Server
 }
 
-func NewServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
+func NewServer(port int, store PessoasStore, isLocal bool) *apiServer {
 	r := mux.NewRouter()
 	addr := fmt.Sprintf(":%d", port)
 	if isLocal {
@@ -25,7 +23,6 @@ func NewServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	}
 
 	api := &apiServer{
-		dbStore: newPessoaDBStore(dbPool),
 		server: http.Server{
 			Addr:    addr,
 			Handler: r,
@@ -33,7 +30,7 @@ func NewServer(port int, dbPool *pgxpool.Pool, isLocal bool) *apiServer {
 	}
 
 	resource := pessoaResource{
-		store: api.dbStore,
+		store: store,
 	}
 	r.Use(handlers.RecoveryHandler())
 	r.Use(setJSONContentType)

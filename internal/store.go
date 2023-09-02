@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/patrickmn/go-cache"
+	"github.com/redis/go-redis/v9"
 )
 
 type pessoaDBStore struct {
@@ -18,14 +19,22 @@ type pessoaDBStore struct {
 	cacheByUID       *cache.Cache
 	cacheSearch      *cache.Cache
 	chSyncPessoaRead chan pessoa
+	client           *redis.Client
 }
 
-func newPessoaDBStore(dbPool *pgxpool.Pool) *pessoaDBStore {
+func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client) *pessoaDBStore {
 	c1 := cache.New(5*time.Minute, 10*time.Minute)
 	c2 := cache.New(5*time.Minute, 10*time.Minute)
 	c3 := cache.New(30*time.Second, 10*time.Minute)
 	chPessoa := make(chan pessoa, 1000)
-	return &pessoaDBStore{dbPool: dbPool, cacheApelido: c1, cacheByUID: c2, cacheSearch: c3, chSyncPessoaRead: chPessoa}
+	return &pessoaDBStore{
+		dbPool:           dbPool,
+		cacheApelido:     c1,
+		cacheByUID:       c2,
+		cacheSearch:      c3,
+		chSyncPessoaRead: chPessoa,
+		client:           client,
+	}
 }
 
 func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {

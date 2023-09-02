@@ -15,6 +15,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -27,13 +28,24 @@ func Test_Endpoints(t *testing.T) {
 	require.NoError(t, err)
 	defer terminate(t)
 
+	redisAddr, terminate, err := startTestRedis(ctx)
+	require.NoError(t, err)
+	defer terminate(t)
+
 	dbPool, err := pgxpool.New(context.Background(), connString)
 	require.NoError(t, err)
 	defer dbPool.Close()
 	err = migrateDB(ctx, dbPool)
 	require.NoError(t, err)
 
-	api := NewServer(8888, dbPool, true)
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	store := NewPessoaDBStore(dbPool, client)
+
+	api := NewServer(8888, store, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
 
@@ -202,12 +214,7 @@ func startTestDB(ctx context.Context) (string, func(t *testing.T), error) {
 		return "", nil, fmt.Errorf("failed to get host :%w", err)
 	}
 
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		envVars["POSTGRES_USER"],
-		envVars["POSTGRES_PASSWORD"],
-		host,
-		port.Int(),
-		envVars["POSTGRES_DB"])
+	connString := getConnString(host, port)
 
 	terminate := func(t *testing.T) {
 		if err := pgC.Terminate(ctx); err != nil {
@@ -215,6 +222,36 @@ func startTestDB(ctx context.Context) (string, func(t *testing.T), error) {
 		}
 	}
 	return connString, terminate, nil
+}
+
+func startTestRedis(ctx context.Context) (string, func(t *testing.T), error) {
+	req := testcontainers.ContainerRequest{
+		Image:        "redis:7-alpine",
+		ExposedPorts: []string{"6379/tcp"},
+		WaitingFor:   wait.ForLog("Ready to accept connections tcp"),
+	}
+	redis, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to start db container :%w", err)
+	}
+	port, err := redis.MappedPort(ctx, "6379/tcp")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get mapped port :%w", err)
+	}
+	host, err := redis.Host(ctx)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get host :%w", err)
+	}
+
+	terminate := func(t *testing.T) {
+		if err := redis.Terminate(ctx); err != nil {
+			t.Fatalf("failed to terminate container: %s", err.Error())
+		}
+	}
+	return fmt.Sprintf("%s:%s", host, port), terminate, nil
 }
 
 func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {

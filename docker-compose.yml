@@ -1,6 +1,18 @@
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    hostname: redis
+    container_name: cache
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '1.4GB'
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
   postgres:
     image: postgres:14
     hostname: postgres
@@ -13,8 +25,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.9'
-          memory: '1.9GB'
+          cpus: '0.5'
+          memory: '1GB'
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
     ports:
@@ -30,52 +42,32 @@ services:
       - "max_connections=250"
       - "-c"
       - "shared_buffers=256MB"
-  api1: # API - Instância 01
+  api1: &api # API - Instância 01
     image: flavio1110/rinha-backend:local
-    hostname: api1
     environment:
-      - HTTP_PORT=8081
+      - HTTP_PORT=8080
       - DB_URL=postgres://user:super-secret@postgres:5432/people?sslmode=disable
       - DB_MAX_CONNECTIONS=100
+      - DB_MIN_CONNECTIONS=0
+      - REDIS_ADDR=redis:6379
     depends_on:
       postgres:
         condition: service_healthy
     expose:
-      - "8081"
+      - "8080"
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: '0.5GB'
+          cpus: '0.2'
+          memory: '0.25GB'
     healthcheck:
-      test: curl -o /dev/null -s --retry 0 --head http://localhost:8081/contagem-pessoas || exit 1
-      interval: 10s
-      retries: 5
+      test: curl -o /dev/null -s --retry 0 --head http://localhost:8080/contagem-pessoas || exit 1
+      interval: 2s
+      retries: 10
       start_period: 20s
       timeout: 5s
-  api2: # API - Instância 01
-    image: flavio1110/rinha-backend:local
-    hostname: api2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - HTTP_PORT=8082
-      - DB_URL=postgres://user:super-secret@postgres:5432/people?sslmode=disable
-      - DB_MAX_CONNECTIONS=100
-    expose:
-      - "8082"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: '0.5GB'
-    healthcheck:
-      test: curl -o /dev/null -s --retry 0 --head http://localhost:8082/contagem-pessoas || exit 1
-      interval: 10s
-      retries: 5
-      start_period: 20s
-      timeout: 5s
+  api2: # API - Instância 02
+    <<: *api
   nginx: # Load Balancer
     image: nginx:latest
     environment:
@@ -93,7 +85,7 @@ services:
       resources:
         limits:
           cpus: '0.1'
-          memory: '0.1GB'
+          memory: "0.1GB"
     healthcheck:
       test: curl --fail http://localhost:9999/contagem-pessoas
       interval: 5s
