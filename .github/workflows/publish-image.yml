@@ -33,25 +33,21 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: | 
-          ls
           make compose-up
+          sleep 3 # wait for the server to start
           curl -o /dev/null -s --retry 0 --head http://localhost:9999/contagem-pessoas || exit 1
           echo "https://${{ github.repository_owner }}.github.io/${{ env.GH_REPO }}/${{ env.GATLING_OUTPUT_FOLDER }}" >> "${GITHUB_STEP_SUMMARY}"
-  login:
-    name: Login to Docker Hub
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
   build-image:
     name: Build and Publish image
     runs-on: ubuntu-latest
     env:
       tag: stable
     steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
       - uses: actions/checkout@v2
       - run: ./scripts/build-image.sh
 
