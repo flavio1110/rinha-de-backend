@@ -51,10 +51,10 @@ jobs:
           ./bin/gatling.sh -rm local -s RinhaBackendSimulation -rd "DESCRICAO" -rf $WORKSPACE/user-files/results -sf $WORKSPACE/user-files/simulations -rsf $WORKSPACE/user-files/resources
           echo GATLING_OUTPUT_FOLDER=$(ls $WORKSPACE/user-files/results | sort | head -n 1) >> $GITHUB_ENV
           sleep 3 # wait for the server to start
-          curl -v "http://localhost:9999/contagem-pessoas"
         env:
           WORKSPACE: ${{ github.workspace }}/rinha-de-backend-2023-q3/stress-test
-      - run: echo ${{ env.GATLING_OUTPUT_FOLDER }}
+      - name: Pessoas added
+        run: curl -v "http://localhost:9999/contagem-pessoas"
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
