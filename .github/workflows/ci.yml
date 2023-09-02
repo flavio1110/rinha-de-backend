@@ -50,6 +50,8 @@ jobs:
           cd gatling-charts-highcharts-bundle-3.9.5
           ./bin/gatling.sh -rm local -s RinhaBackendSimulation -rd "DESCRICAO" -rf $WORKSPACE/user-files/results -sf $WORKSPACE/user-files/simulations -rsf $WORKSPACE/user-files/resources
           echo GATLING_OUTPUT_FOLDER=$(ls $WORKSPACE/user-files/results | sort | head -n 1) >> $GITHUB_ENV
+          sleep 3
+          curl -v "http://localhost:9999/contagem-pessoas"
         env:
           WORKSPACE: ${{ github.workspace }}/rinha-de-backend-2023-q3/stress-test
       - run: echo ${{ env.GATLING_OUTPUT_FOLDER }}
