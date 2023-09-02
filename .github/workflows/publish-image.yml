@@ -30,8 +30,8 @@ jobs:
   smoke_test:
     name: Smoke test
     runs-on: ubuntu-latest
-
     steps:
+      - uses: actions/checkout@v2
       - run: | 
           ls
           make compose-up
@@ -52,6 +52,6 @@ jobs:
     env:
       tag: stable
     steps:
-      - run: ls
+      - uses: actions/checkout@v2
       - run: ./scripts/build-image.sh
 
