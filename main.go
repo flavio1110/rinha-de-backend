@@ -64,7 +64,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Stop server")
 	}
 
-	store.StopSync(ctx)
+	store.StopSync()
 	log.Info().Msg("Server stopped")
 }
 

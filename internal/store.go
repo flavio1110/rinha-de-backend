@@ -122,6 +122,16 @@ func (p *PessoaDBStore) StartSync(ctx context.Context) error {
 
 func (p *PessoaDBStore) sync(ctx context.Context) {
 	ctx = context.WithoutCancel(ctx)
+	var bulk []pessoa
+
+	insertBulk := func(batch []pessoa) {
+		if err := p.bulkInsert(ctx, batch); err != nil {
+			log.Error().Err(err).Msg("Sync Pessoas: batch insert")
+		}
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+
 	for {
 		select {
 		case <-p.chSignStop:
@@ -131,22 +141,47 @@ func (p *PessoaDBStore) sync(ctx context.Context) {
 				log.Info().Msg("Sync Pessoas: stopped")
 				return
 			}
-
-			terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
-			insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
-    				($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING  returning uid;`
-
-			_, err := p.dbPool.
-				Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
-
-			if err != nil {
-				log.Error().Err(err).Msgf("Sync Pessoas: %s", pes.UID)
+			bulk = append(bulk, pes)
+			if len(bulk) >= 100 {
+				go insertBulk(bulk)
+				bulk = nil
+			}
+		case <-ticker.C:
+			if len(bulk) > 0 {
+				go insertBulk(bulk)
+				bulk = nil
 			}
 		}
 	}
 }
 
-func (p *PessoaDBStore) StopSync(ctx context.Context) {
+func (p *PessoaDBStore) bulkInsert(ctx context.Context, bulk []pessoa) error {
+	var inputRows [][]interface{}
+
+	for i := range bulk {
+		inputRows = append(inputRows, []interface{}{
+			bulk[i].Apelido,
+			bulk[i].UID,
+			bulk[i].Nome,
+			bulk[i].Nascimento,
+			bulk[i].Stack,
+			fmt.Sprintf("%s %s %s", strings.ToLower(bulk[i].Apelido), strings.ToLower(bulk[i].Nome), strings.ToLower(strings.Join(bulk[i].Stack, " "))),
+		})
+	}
+
+	copyCount, err := p.dbPool.CopyFrom(ctx, pgx.Identifier{"pessoas"},
+		[]string{"apelido", "uid", "nome", "nascimento", "stack", "search_terms"},
+		pgx.CopyFromRows(inputRows))
+	if err != nil {
+		return fmt.Errorf("CopyFrom: %w", err)
+	}
+	if int(copyCount) != len(inputRows) {
+		return fmt.Errorf("CopyFrom: expected %d rows to be copied, got %d", len(inputRows), copyCount)
+	}
+	return nil
+}
+
+func (p *PessoaDBStore) StopSync() {
 	log.Info().Msg("Stopping sync...waiting 5 seconds to finish sync")
 	close(p.chSyncPessoa)
 	time.Sleep(5 * time.Second)
