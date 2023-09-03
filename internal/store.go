@@ -17,7 +17,7 @@ import (
 
 type Cache interface {
 	Get(ctx context.Context, key string, dest any) (bool, error)
-	Add(ctx context.Context, key string, value any, expiration int) error
+	Add(ctx context.Context, key string, value any, expiration time.Duration) error
 }
 
 type PessoaDBStore struct {
@@ -42,11 +42,11 @@ func (p *PessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 
 	// try to add the apelido to the cache
 	// if it already exists, we skip the insert
-	if err := p.cache.Add(ctx, apelidoKey, true, 0); err != nil {
+	if err := p.cache.Add(ctx, apelidoKey, true, 24*time.Hour); err != nil {
 		return errAddSkipped
 	}
 
-	if err := p.cache.Add(ctx, pes.UID.String(), pes, 0); err != nil {
+	if err := p.cache.Add(ctx, pes.UID.String(), pes, 24*time.Hour); err != nil {
 		return errAddSkipped
 	}
 
@@ -87,6 +87,11 @@ func (p *PessoaDBStore) Count(ctx context.Context) (int, error) {
 
 func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
 	var pessoas []pessoa
+
+	if found, _ := p.cache.Get(ctx, term, &pessoas); found {
+		return pessoas, nil
+	}
+
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
 	   from pessoas
@@ -109,6 +114,11 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating over pessoas: %w", err)
 	}
+	if pessoas == nil {
+		pessoas = []pessoa{}
+	}
+
+	_ = p.cache.Add(ctx, term, pessoas, 60*time.Second)
 
 	return pessoas, nil
 }
@@ -223,13 +233,13 @@ func (r redisCache) Get(ctx context.Context, key string, dest any) (bool, error)
 	return true, nil
 }
 
-func (r redisCache) Add(ctx context.Context, key string, value any, expiration int) error {
+func (r redisCache) Add(ctx context.Context, key string, value any, expiration time.Duration) error {
 	val, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("marshaling value: %w", err)
 	}
 
-	added := r.client.SetNX(ctx, key, val, 0).Val()
+	added := r.client.SetNX(ctx, key, val, expiration).Val()
 	if !added {
 		return errors.New("value not added")
 	}
