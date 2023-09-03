@@ -9,6 +9,5 @@ create table pessoas (
     search_terms text
 );
 
-CREATE index ix_uid on pessoas (uid);
 CREATE INDEX ix_search_terms ON pessoas USING gist (search_terms gist_trgm_ops);
 

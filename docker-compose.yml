@@ -12,7 +12,7 @@ services:
           memory: '1.4GB'
     ports:
       - "6379:6379"
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --tcp-keepalive 300
   postgres:
     image: postgres:14
     hostname: postgres
@@ -36,12 +36,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    command:
-      - "postgres"
-      - "-c"
-      - "max_connections=250"
-      - "-c"
-      - "shared_buffers=256MB"
+    command: 'postgres -c max_connections=200 -c shared_buffers=512MB -c synchronous_commit=off -c fsync=off -c full_page_writes=off'
   api1: &api # API - Instância 01
     image: flavio1110/rinha-backend:local
     environment:
