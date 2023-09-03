@@ -140,7 +140,7 @@ func (p *PessoaDBStore) sync(ctx context.Context) {
 		}
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 
 	for {
 		select {
