@@ -45,6 +45,9 @@ func Test_Endpoints(t *testing.T) {
 	})
 	store := NewPessoaDBStore(dbPool, client)
 
+	err = store.StartSync(ctx)
+	assert.NoError(t, err)
+
 	api := NewServer(8888, store, true)
 	ts := httptest.NewServer(api.server.Handler)
 	defer ts.Close()
@@ -130,12 +133,15 @@ func Test_Endpoints(t *testing.T) {
 	}
 
 	t.Run("count pessoas", func(t *testing.T) {
-		resp, err := ts.Client().Get(ts.URL + "/contagem-pessoas")
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		assert.NoError(t, err)
-		assert.Equal(t, fmt.Sprintf("%d", len(locations)), string(body))
+		assert.Eventuallyf(t, func() bool {
+			resp, err := ts.Client().Get(ts.URL + "/contagem-pessoas")
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
+			return assert.Equal(t, fmt.Sprintf("%d", len(locations)), string(body))
+		}, 5*time.Second, 2*time.Second, "timeout waiting for count")
+
 	})
 
 	t.Run("search pessoas", func(t *testing.T) {

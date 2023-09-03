@@ -47,6 +47,9 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
+		if err := store.StartSync(ctx); err != nil {
+			log.Fatal().Err(err).Msg("Start sync")
+		}
 		if err := server.Start(ctx); err != nil {
 			log.Fatal().Err(err).Msg("Start http server")
 		}
@@ -61,6 +64,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Stop server")
 	}
 
+	store.StopSync(ctx)
 	log.Info().Msg("Server stopped")
 }
 

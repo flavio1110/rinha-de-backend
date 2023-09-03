@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 type Cache interface {
@@ -18,28 +20,24 @@ type Cache interface {
 	Add(ctx context.Context, key string, value any, expiration int) error
 }
 
-func NewRedisCache(client *redis.Client) *redisCache {
-	return &redisCache{
-		client: client,
-	}
+type PessoaDBStore struct {
+	dbPool       *pgxpool.Pool
+	chSyncPessoa chan pessoa
+	chSignStop   chan struct{}
+	cache        Cache
 }
 
-type pessoaDBStore struct {
-	dbPool           *pgxpool.Pool
-	chSyncPessoaRead chan pessoa
-	cache            Cache
-}
-
-func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client) *pessoaDBStore {
+func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client) *PessoaDBStore {
 	chPessoa := make(chan pessoa, 1000)
-	return &pessoaDBStore{
-		dbPool:           dbPool,
-		chSyncPessoaRead: chPessoa,
-		cache:            NewRedisCache(client),
+	return &PessoaDBStore{
+		dbPool:       dbPool,
+		chSyncPessoa: chPessoa,
+		chSignStop:   make(chan struct{}, 1),
+		cache:        NewRedisCache(client),
 	}
 }
 
-func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
+func (p *PessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 	apelidoKey := fmt.Sprintf("apelido:%s", pes.Apelido)
 
 	// try to add the apelido to the cache
@@ -52,21 +50,11 @@ func (p *pessoaDBStore) Add(ctx context.Context, pes pessoa) error {
 		return errAddSkipped
 	}
 
-	terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
-	insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
-    ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING  returning uid;`
-
-	_, err := p.dbPool.
-		Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
-
-	if err != nil {
-		return fmt.Errorf("inserting pessoa: %w", err)
-	}
-
+	p.chSyncPessoa <- pes
 	return nil
 }
 
-func (p *pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
+func (p *PessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 	var pes pessoa
 
 	if found, _ := p.cache.Get(ctx, id.String(), &pes); found {
@@ -78,7 +66,7 @@ func (p *pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 		Scan(&pes.Apelido, &pes.UID, &pes.Nome, &pes.Nascimento, &pes.Stack)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return pessoa{}, errNotFound
 		}
 
@@ -88,7 +76,7 @@ func (p *pessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 	return pes, nil
 }
 
-func (p *pessoaDBStore) Count(ctx context.Context) (int, error) {
+func (p *PessoaDBStore) Count(ctx context.Context) (int, error) {
 	var count int
 	err := p.dbPool.QueryRow(ctx, "select count(1) from pessoas;").Scan(&count)
 	if err != nil {
@@ -97,7 +85,7 @@ func (p *pessoaDBStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
+func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
 	var pessoas []pessoa
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
@@ -123,6 +111,53 @@ func (p *pessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	}
 
 	return pessoas, nil
+}
+
+func (p *PessoaDBStore) StartSync(ctx context.Context) error {
+	log.Info().Msg("Starting sync")
+
+	go p.sync(ctx)
+	return nil
+}
+
+func (p *PessoaDBStore) sync(ctx context.Context) {
+	ctx = context.WithoutCancel(ctx)
+	for {
+		select {
+		case <-p.chSignStop:
+			log.Info().Msg("Sync Pessoas: force stopped")
+		case pes, ok := <-p.chSyncPessoa:
+			if !ok {
+				log.Info().Msg("Sync Pessoas: stopped")
+				return
+			}
+
+			terms := fmt.Sprintf("%s %s %s", strings.ToLower(pes.Apelido), strings.ToLower(pes.Nome), strings.ToLower(strings.Join(pes.Stack, " ")))
+			insert := `INSERT INTO pessoas (Apelido, UID, Nome, Nascimento, Stack, search_terms) VALUES
+    				($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING  returning uid;`
+
+			_, err := p.dbPool.
+				Exec(ctx, insert, pes.Apelido, pes.UID, pes.Nome, pes.Nascimento, pes.Stack, terms)
+
+			if err != nil {
+				log.Error().Err(err).Msgf("Sync Pessoas: %s", pes.UID)
+			}
+		}
+	}
+}
+
+func (p *PessoaDBStore) StopSync(ctx context.Context) {
+	log.Info().Msg("Stopping sync...waiting 5 seconds to finish sync")
+	close(p.chSyncPessoa)
+	time.Sleep(5 * time.Second)
+
+	close(p.chSignStop)
+}
+
+func NewRedisCache(client *redis.Client) *redisCache {
+	return &redisCache{
+		client: client,
+	}
 }
 
 type redisCache struct {
