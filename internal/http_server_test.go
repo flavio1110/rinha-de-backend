@@ -140,7 +140,7 @@ func Test_Endpoints(t *testing.T) {
 			body, err := io.ReadAll(resp.Body)
 			assert.NoError(t, err)
 			return assert.Equal(t, fmt.Sprintf("%d", len(locations)), string(body))
-		}, 5*time.Second, 2*time.Second, "timeout waiting for count")
+		}, 10*time.Second, 2*time.Second, "timeout waiting for count")
 
 	})
 

@@ -130,14 +130,22 @@ func (p *PessoaDBStore) sync(ctx context.Context) {
 		}
 	}
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 
 	for {
 		select {
 		case <-p.chSignStop:
+			if len(bulk) > 0 {
+				go insertBulk(bulk)
+			}
 			log.Info().Msg("Sync Pessoas: force stopped")
+			return
 		case pes, ok := <-p.chSyncPessoa:
 			if !ok {
+				if len(bulk) > 0 {
+					go insertBulk(bulk)
+				}
+
 				log.Info().Msg("Sync Pessoas: stopped")
 				return
 			}
