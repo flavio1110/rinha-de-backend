@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	//_ "net/http/pprof"
 
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )
@@ -32,13 +32,20 @@ func NewServer(port int, store PessoasStore, isLocal bool) *apiServer {
 	resource := pessoaResource{
 		store: store,
 	}
-	r.Use(handlers.RecoveryHandler())
+
 	r.Use(setJSONContentType)
 	r.HandleFunc("/status", statusHandler).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.postPessoa).Methods(http.MethodPost)
 	r.HandleFunc("/pessoas/{id}", resource.getPessoa).Methods(http.MethodGet)
 	r.HandleFunc("/contagem-pessoas", resource.countPessoas).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.searchPessoas).Methods(http.MethodGet)
+
+	//r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	//r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	//r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	//r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	//r.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	//r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 	return api
 }
 

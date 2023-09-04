@@ -25,15 +25,17 @@ type PessoaDBStore struct {
 	chSyncPessoa chan pessoa
 	chSignStop   chan struct{}
 	cache        Cache
+	syncInterval time.Duration
 }
 
-func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client) *PessoaDBStore {
+func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client, syncInterval time.Duration) *PessoaDBStore {
 	chPessoa := make(chan pessoa, 1000)
 	return &PessoaDBStore{
 		dbPool:       dbPool,
 		chSyncPessoa: chPessoa,
 		chSignStop:   make(chan struct{}, 1),
 		cache:        NewRedisCache(client),
+		syncInterval: syncInterval,
 	}
 }
 
@@ -60,18 +62,21 @@ func (p *PessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 	if found, _ := p.cache.Get(ctx, id.String(), &pes); found {
 		return pes, nil
 	}
-
+	log.Debug().Msgf("Cache miss for %s", id.String())
 	query := "select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack from pessoas where UID = $1;"
 	err := p.dbPool.QueryRow(ctx, query, id).
 		Scan(&pes.Apelido, &pes.UID, &pes.Nome, &pes.Nascimento, &pes.Stack)
 
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return pessoa{}, errNotFound
-		}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pessoa{}, errNotFound
+	}
 
+	if err != nil {
 		return pessoa{}, fmt.Errorf("querying pessoa: %w", err)
 	}
+
+	// no need to check error here
+	_ = p.cache.Add(ctx, pes.UID.String(), pes, 24*time.Hour)
 
 	return pes, nil
 }
@@ -126,21 +131,20 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 func (p *PessoaDBStore) StartSync(ctx context.Context) error {
 	log.Info().Msg("Starting sync")
 
-	go p.sync(ctx)
+	go p.sync()
 	return nil
 }
 
-func (p *PessoaDBStore) sync(ctx context.Context) {
-	ctx = context.WithoutCancel(ctx)
+func (p *PessoaDBStore) sync() {
 	var bulk []pessoa
 
 	insertBulk := func(batch []pessoa) {
-		if err := p.bulkInsert(ctx, batch); err != nil {
+		if err := p.bulkInsert(batch); err != nil {
 			log.Error().Err(err).Msg("Sync Pessoas: batch insert")
 		}
 	}
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(p.syncInterval)
 
 	for {
 		select {
@@ -160,7 +164,7 @@ func (p *PessoaDBStore) sync(ctx context.Context) {
 				return
 			}
 			bulk = append(bulk, pes)
-			if len(bulk) >= 100 {
+			if len(bulk) >= 1000 {
 				go insertBulk(bulk)
 				bulk = nil
 			}
@@ -173,7 +177,7 @@ func (p *PessoaDBStore) sync(ctx context.Context) {
 	}
 }
 
-func (p *PessoaDBStore) bulkInsert(ctx context.Context, bulk []pessoa) error {
+func (p *PessoaDBStore) bulkInsert(bulk []pessoa) error {
 	var inputRows [][]interface{}
 
 	for i := range bulk {
@@ -187,7 +191,7 @@ func (p *PessoaDBStore) bulkInsert(ctx context.Context, bulk []pessoa) error {
 		})
 	}
 
-	copyCount, err := p.dbPool.CopyFrom(ctx, pgx.Identifier{"pessoas"},
+	copyCount, err := p.dbPool.CopyFrom(context.Background(), pgx.Identifier{"pessoas"},
 		[]string{"apelido", "uid", "nome", "nascimento", "stack", "search_terms"},
 		pgx.CopyFromRows(inputRows))
 	if err != nil {

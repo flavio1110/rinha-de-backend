@@ -13,10 +13,13 @@ import (
 	"github.com/flavio1110/rinha-de-backend/internal"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	dbPool := setupDB()
 	defer dbPool.Close()
@@ -28,6 +31,7 @@ func main() {
 		Addr:     os.Getenv("REDIS_ADDR"),
 		Password: "", // no password set
 		DB:       0,  // use default DB
+
 	})
 
 	if status := client.Ping(ctx); status.Err() != nil {
@@ -40,7 +44,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("Unable to parse HTTP_PORT %q", os.Getenv("HTTP_PORT"))
 	}
 
-	store := internal.NewPessoaDBStore(dbPool, client)
+	store := internal.NewPessoaDBStore(dbPool, client, 30*time.Second)
 	server := internal.NewServer(port, store, isLocal)
 
 	sig := make(chan os.Signal, 1)

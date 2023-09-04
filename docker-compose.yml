@@ -8,7 +8,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: '1.4GB'
     ports:
       - "6379:6379"
@@ -25,7 +25,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.2'
           memory: '1GB'
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
@@ -36,24 +36,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    command: 'postgres -c max_connections=200 -c shared_buffers=512MB -c synchronous_commit=off -c fsync=off -c full_page_writes=off'
+    command: 'postgres -c max_connections=250 -c shared_buffers=512MB -c synchronous_commit=off -c fsync=off -c full_page_writes=off'
   api1: &api # API - Instância 01
     image: flavio1110/rinha-backend:local
     environment:
       - HTTP_PORT=8080
       - DB_URL=postgres://user:super-secret@postgres:5432/people?sslmode=disable
       - DB_MAX_CONNECTIONS=100
-      - DB_MIN_CONNECTIONS=50
+      - DB_MIN_CONNECTIONS=100
       - REDIS_ADDR=redis:6379
     depends_on:
       postgres:
         condition: service_healthy
     expose:
       - "8080"
+    ports:
+      - "9091:8080"
     deploy:
       resources:
         limits:
-          cpus: '0.2'
+          cpus: '0.45'
           memory: '0.25GB'
     healthcheck:
       test: curl -o /dev/null -s --retry 0 --head http://localhost:8080/contagem-pessoas || exit 1
@@ -63,6 +65,8 @@ services:
       timeout: 5s
   api2: # API - Instância 02
     <<: *api
+    ports:
+      - "9092:8080"
   nginx: # Load Balancer
     image: nginx:latest
     environment:

@@ -43,7 +43,7 @@ func Test_Endpoints(t *testing.T) {
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-	store := NewPessoaDBStore(dbPool, client)
+	store := NewPessoaDBStore(dbPool, client, 1*time.Second)
 
 	err = store.StartSync(ctx)
 	assert.NoError(t, err)
