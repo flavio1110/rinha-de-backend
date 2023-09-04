@@ -23,17 +23,18 @@ type Cache interface {
 type PessoaDBStore struct {
 	dbPool       *pgxpool.Pool
 	chSyncPessoa chan pessoa
+	chBulk       chan []pessoa
 	chSignStop   chan struct{}
 	cache        Cache
 	syncInterval time.Duration
 }
 
 func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client, syncInterval time.Duration) *PessoaDBStore {
-	chPessoa := make(chan pessoa, 1000)
 	return &PessoaDBStore{
 		dbPool:       dbPool,
-		chSyncPessoa: chPessoa,
 		chSignStop:   make(chan struct{}, 1),
+		chSyncPessoa: make(chan pessoa),
+		chBulk:       make(chan []pessoa),
 		cache:        NewRedisCache(client),
 		syncInterval: syncInterval,
 	}
@@ -131,48 +132,37 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 func (p *PessoaDBStore) StartSync(ctx context.Context) error {
 	log.Info().Msg("Starting sync")
 
-	go p.sync()
+	go p.processInserts()
+	go p.syncBulks()
 	return nil
 }
 
-func (p *PessoaDBStore) sync() {
-	var bulk []pessoa
-
-	insertBulk := func(batch []pessoa) {
-		if err := p.bulkInsert(batch); err != nil {
-			log.Error().Err(err).Msg("Sync Pessoas: batch insert")
-		}
-	}
-
+func (p *PessoaDBStore) processInserts() {
+	maxBatchSize := 5000
+	bulk := make([]pessoa, 0, maxBatchSize)
 	ticker := time.NewTicker(p.syncInterval)
 
 	for {
 		select {
 		case <-p.chSignStop:
-			if len(bulk) > 0 {
-				go insertBulk(bulk)
-			}
+			close(p.chBulk)
 			log.Info().Msg("Sync Pessoas: force stopped")
 			return
-		case pes, ok := <-p.chSyncPessoa:
-			if !ok {
-				if len(bulk) > 0 {
-					go insertBulk(bulk)
-				}
-
-				log.Info().Msg("Sync Pessoas: stopped")
-				return
-			}
+		case pes := <-p.chSyncPessoa:
 			bulk = append(bulk, pes)
-			if len(bulk) >= 1000 {
-				go insertBulk(bulk)
-				bulk = nil
-			}
 		case <-ticker.C:
 			if len(bulk) > 0 {
-				go insertBulk(bulk)
-				bulk = nil
+				p.chBulk <- bulk
+				bulk = make([]pessoa, 0, maxBatchSize)
 			}
+		}
+	}
+}
+
+func (p *PessoaDBStore) syncBulks() {
+	for bulk := range p.chBulk {
+		if err := p.bulkInsert(bulk); err != nil {
+			log.Error().Err(err).Msg("Sync Pessoas: bulk insert")
 		}
 	}
 }

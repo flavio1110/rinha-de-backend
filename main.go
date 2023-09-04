@@ -44,7 +44,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("Unable to parse HTTP_PORT %q", os.Getenv("HTTP_PORT"))
 	}
 
-	store := internal.NewPessoaDBStore(dbPool, client, 30*time.Second)
+	store := internal.NewPessoaDBStore(dbPool, client, 10*time.Second)
 	server := internal.NewServer(port, store, isLocal)
 
 	sig := make(chan os.Signal, 1)
