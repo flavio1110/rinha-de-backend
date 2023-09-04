@@ -93,17 +93,17 @@ func (p *PessoaDBStore) Count(ctx context.Context) (int, error) {
 
 func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, error) {
 	var pessoas []pessoa
-
-	if found, _ := p.cache.Get(ctx, term, &pessoas); found {
+	searhTermLower := strings.ToLower(term)
+	if found, _ := p.cache.Get(ctx, searhTermLower, &pessoas); found {
 		return pessoas, nil
 	}
 
 	query := `
 	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
 	   from pessoas
-	     where search_terms ilike $1 limit 50;`
+	     where search_terms like $1 limit 50;`
 
-	rows, err := p.dbPool.Query(ctx, query, "%"+term+"%")
+	rows, err := p.dbPool.Query(ctx, query, "%"+searhTermLower+"%")
 	if err != nil {
 		return nil, fmt.Errorf("querying pessoas: %w", err)
 	}
@@ -124,7 +124,7 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 		pessoas = []pessoa{}
 	}
 
-	_ = p.cache.Add(ctx, term, pessoas, 60*time.Second)
+	_ = p.cache.Add(ctx, searhTermLower, pessoas, 60*time.Second)
 
 	return pessoas, nil
 }
