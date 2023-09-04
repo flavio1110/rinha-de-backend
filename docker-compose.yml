@@ -8,8 +8,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.3'
-          memory: '1.4GB'
+          cpus: '0.2'
+          memory: '0.9GB'
     ports:
       - "6379:6379"
     command: redis-server --save "" --appendonly no --tcp-keepalive 300 --maxclients 15000
@@ -25,8 +25,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.2'
-          memory: '1GB'
+          cpus: '0.4'
+          memory: '1.5GB'
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
     ports:
@@ -55,7 +55,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.45'
+          cpus: '0.4'
           memory: '0.25GB'
     healthcheck:
       test: curl -o /dev/null -s --retry 0 --head http://localhost:8080/contagem-pessoas || exit 1
