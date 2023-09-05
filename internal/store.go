@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const maxBatchSize = 5000
+
 type Cache interface {
 	Get(ctx context.Context, key string, dest any) (bool, error)
 	Add(ctx context.Context, key string, value any, expiration time.Duration) error
@@ -33,8 +35,8 @@ func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client, syncInterval t
 	return &PessoaDBStore{
 		dbPool:       dbPool,
 		chSignStop:   make(chan struct{}, 1),
-		chSyncPessoa: make(chan pessoa),
-		chBulk:       make(chan []pessoa),
+		chSyncPessoa: make(chan pessoa, maxBatchSize),
+		chBulk:       make(chan []pessoa, 10),
 		cache:        NewRedisCache(client),
 		syncInterval: syncInterval,
 	}
