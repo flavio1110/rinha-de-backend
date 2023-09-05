@@ -16,12 +16,20 @@
 - [Challenge (PT-BR)](https://github.com/zanfranceschi/rinha-de-backend-2023-q3)
 - [Instructions (PT-BR)](https://github.com/zanfranceschi/rinha-de-backend-2023-q3/blob/main/INSTRUCOES.md)
 
-Some decisions were made to simplify the challenge, such as:
+## Commands TL;DR
+````
+make run # Start only the APP
+make up-deps # Start the app and dependencies (DB and Redis)
+make tests # Run acceptance tests
+make lint # Run linter
 
+make compose-up # Start the app with docker-compose
+````
+
+## NB! This code should not be used as a reference for production software!
+Some decisions here are intended just to make the code simpler and faster to write, but they are not ideal for production software. For example:
 
 - Pre-allocating all DB connections available for the app. It speeds up the warm-up, but it's not ideal.
-- Missing graceful shutdown for syncing the read table. If the app is killed, the read table will be out of sync.
-- No batching of writes of the replica table. Despite adding them one by one, we could batch the items and save many DB roundtrips.
 - Not enforcing uniqueness of UUID on the write table. The likelihood of collision is very low, but it's not zero.
 - etc.. :)
 
