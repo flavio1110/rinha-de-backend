@@ -27,13 +27,13 @@ type PessoasStore interface {
 func (s *pessoaResource) postPessoa(w http.ResponseWriter, r *http.Request) {
 	var pessoa pessoa
 	if err := json.NewDecoder(r.Body).Decode(&pessoa); err != nil {
-		writeResponse(w, http.StatusBadRequest, "")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	if !isNewPessoaValid(pessoa) {
-		writeResponse(w, http.StatusUnprocessableEntity, "")
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -41,38 +41,38 @@ func (s *pessoaResource) postPessoa(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.store.Add(r.Context(), pessoa); err != nil {
 		if errors.Is(err, errAddSkipped) {
-			writeResponse(w, http.StatusUnprocessableEntity, "")
+			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		}
 		log.Err(err).Msg("error adding pessoa")
-		writeResponse(w, http.StatusInternalServerError, "")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Add("Location", fmt.Sprintf("/pessoas/%s", pessoa.UID))
-	writeJsonResponse(w, http.StatusCreated, pessoa)
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (s *pessoaResource) getPessoa(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, ok := vars["id"]
 	if !ok {
-		writeResponse(w, http.StatusBadRequest, "")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		writeResponse(w, http.StatusNotFound, "")
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	pessoa, err := s.store.Get(r.Context(), uid)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
-			writeResponse(w, http.StatusNotFound, "")
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		log.Err(err).Msg("error getting pessoa")
-		writeResponse(w, http.StatusInternalServerError, "")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -93,13 +93,13 @@ func (s *pessoaResource) countPessoas(w http.ResponseWriter, r *http.Request) {
 func (s *pessoaResource) searchPessoas(w http.ResponseWriter, r *http.Request) {
 	term := r.URL.Query().Get("t")
 	if term == "" {
-		writeResponse(w, http.StatusBadRequest, "")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	pessoas, err := s.store.Search(r.Context(), term)
 	if err != nil {
 		log.Err(err).Msg("error searching pessoas")
-		writeResponse(w, http.StatusInternalServerError, "")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if pessoas == nil {

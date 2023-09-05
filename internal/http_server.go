@@ -40,12 +40,6 @@ func NewServer(port int, store PessoasStore, isLocal bool) *apiServer {
 	r.HandleFunc("/contagem-pessoas", resource.countPessoas).Methods(http.MethodGet)
 	r.HandleFunc("/pessoas", resource.searchPessoas).Methods(http.MethodGet)
 
-	//r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	//r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	//r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	//r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	//r.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	//r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 	return api
 }
 
