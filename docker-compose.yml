@@ -14,7 +14,7 @@ services:
       - "6379:6379"
     command: redis-server --save "" --appendonly no --tcp-keepalive 300 --maxclients 15000
   postgres:
-    image: postgres:14
+    image: postgres:15
     hostname: postgres
     container_name: db-pessoas
     environment:

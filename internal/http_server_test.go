@@ -199,7 +199,7 @@ func startTestDB(ctx context.Context) (string, func(t *testing.T), error) {
 	}
 
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:14",
+		Image:        "postgres:15",
 		ExposedPorts: []string{envVars["PORT"]},
 		Env:          envVars,
 		WaitingFor:   wait.ForSQL(nat.Port(envVars["PORT"]), "pgx", getConnString).WithStartupTimeout(time.Second * 15),

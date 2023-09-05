@@ -5,7 +5,7 @@ create table pessoas (
     uid uuid not null,
     nome  varchar(100) not null,
     nascimento date not null,
-    stack varchar(32)[] null,
+    stack text null,
     search_terms text
 );
 

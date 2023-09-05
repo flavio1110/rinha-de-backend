@@ -65,10 +65,13 @@ func (p *PessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 	if found, _ := p.cache.Get(ctx, id.String(), &pes); found {
 		return pes, nil
 	}
-	log.Debug().Msgf("Cache miss for %s", id.String())
-	query := "select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack from pessoas where UID = $1;"
+
+	var stack string
+	var date time.Time
+
+	query := "select Apelido, UID, Nome, Nascimento, Stack from pessoas where UID = $1;"
 	err := p.dbPool.QueryRow(ctx, query, id).
-		Scan(&pes.Apelido, &pes.UID, &pes.Nome, &pes.Nascimento, &pes.Stack)
+		Scan(&pes.Apelido, &pes.UID, &pes.Nome, date, stack)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return pessoa{}, errNotFound
@@ -77,6 +80,9 @@ func (p *PessoaDBStore) Get(ctx context.Context, id uuid.UUID) (pessoa, error) {
 	if err != nil {
 		return pessoa{}, fmt.Errorf("querying pessoa: %w", err)
 	}
+
+	pes.Stack = strings.Split(stack, "|")
+	pes.Nascimento = date.Format("2006-01-02")
 
 	// no need to check error here
 	_ = p.cache.Add(ctx, pes.UID.String(), pes, 24*time.Hour)
@@ -101,7 +107,7 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	}
 
 	query := `
-	select Apelido, UID, Nome, to_char(Nascimento, 'YYYY-MM-DD'), Stack 
+	select Apelido, UID, Nome, Nascimento, Stack 
 	   from pessoas
 	     where search_terms like $1 limit 50;`
 
@@ -111,12 +117,17 @@ func (p *PessoaDBStore) Search(ctx context.Context, term string) ([]pessoa, erro
 	}
 	defer rows.Close()
 
+	var date time.Time
+	var stack string
+	var pes pessoa
+
 	for rows.Next() {
-		var pes pessoa
-		err := rows.Scan(&pes.Apelido, &pes.UID, &pes.Nome, &pes.Nascimento, &pes.Stack)
+		err := rows.Scan(&pes.Apelido, &pes.UID, &pes.Nome, &date, &stack)
 		if err != nil {
 			return nil, fmt.Errorf("scanning pessoa: %w", err)
 		}
+		pes.Stack = strings.Split(stack, "|")
+		pes.Nascimento = date.Format("2006-01-02")
 		pessoas = append(pessoas, pes)
 	}
 	if err := rows.Err(); err != nil {
@@ -178,7 +189,7 @@ func (p *PessoaDBStore) bulkInsert(bulk []pessoa) error {
 			bulk[i].UID,
 			bulk[i].Nome,
 			bulk[i].Nascimento,
-			bulk[i].Stack,
+			strings.Join(bulk[i].Stack, "|"),
 			fmt.Sprintf("%s %s %s", strings.ToLower(bulk[i].Apelido), strings.ToLower(bulk[i].Nome), strings.ToLower(strings.Join(bulk[i].Stack, " "))),
 		})
 	}
