@@ -22,17 +22,13 @@ tidy:
 prepare-commit: lint tests
 	@echo lint and testing passed
 
-.PHONY: db-up
-db-up:
-	@docker-compose -f docker-compose.yml up -d postgres
-
 .PHONY: down-deps
 down-deps:
-	@docker-compose -f docker-compose.yml down
+	@docker-compose -f docker-compose.yml -p "flavio1110-rinha" down
 
 .PHONY: up-deps
 up-deps:
-	@docker-compose -f ./deploy/docker-compose.yml up -d postgres redis
+	@docker-compose -f ./deploy/docker-compose.yml -p "flavio1110-rinha" up -d postgres redis
 
 .PHONY: build-docker
 build-docker:
@@ -41,8 +37,8 @@ build-docker:
 .PHONY: compose-up
 compose-up:
 	@./scripts/build-image.sh
-	@docker-compose -f ./deploy/docker-compose.yml up -d
+	@docker-compose -f ./deploy/docker-compose.yml -p "flavio1110-rinha" up -d
 
 .PHONY: compose-complete-down
 compose-down:
-	@docker-compose -f ./deploy/docker-compose.yml down
+	@docker-compose -f ./deploy/docker-compose.yml -p "flavio1110-rinha" down

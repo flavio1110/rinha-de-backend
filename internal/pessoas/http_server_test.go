@@ -1,4 +1,4 @@
-package internal
+package pessoas
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -24,26 +23,25 @@ import (
 
 func Test_Endpoints(t *testing.T) {
 	ctx := context.Background()
-	connString, terminate, err := startTestDB(ctx)
-	require.NoError(t, err)
-	defer terminate(t)
 
-	redisAddr, terminate, err := startTestRedis(ctx)
+	connString, terminateDB, err := startTestDB(ctx)
 	require.NoError(t, err)
-	defer terminate(t)
+	defer terminateDB(t)
 
-	dbPool, err := pgxpool.New(context.Background(), connString)
+	redisAddr, terminateRedis, err := startTestRedis(ctx)
 	require.NoError(t, err)
-	defer dbPool.Close()
-	err = migrateDB(ctx, dbPool)
-	require.NoError(t, err)
+	defer terminateRedis(t)
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-	store := NewPessoaDBStore(dbPool, client, 1*time.Second)
+	redisClient, err := NewRedisCache(ctx, redisAddr)
+	require.NoError(t, err, "configure redis")
+
+	store, terminateDBPool, err := NewPessoaDBStore(DBConfig{DbURL: connString, MaxConn: 10, MinConn: 5}, redisClient, 1*time.Second)
+	require.NoError(t, err, "configure db store")
+	defer terminateDBPool()
+
+	if err := migrateDB(ctx, connString); err != nil {
+		require.NoError(t, err, "migrate DB")
+	}
 
 	err = store.StartSync(ctx)
 	assert.NoError(t, err)
@@ -260,8 +258,13 @@ func startTestRedis(ctx context.Context) (string, func(t *testing.T), error) {
 	return fmt.Sprintf("%s:%d", host, port.Int()), terminate, nil
 }
 
-func migrateDB(ctx context.Context, dbPool *pgxpool.Pool) error {
-	initContent, err := os.ReadFile("../initdb.sql")
+func migrateDB(ctx context.Context, connString string) error {
+	dbPool, err := pgxpool.New(ctx, connString)
+	if err != nil {
+		return fmt.Errorf("creating connection pool: %w", err)
+	}
+
+	initContent, err := os.ReadFile("../../deploy/initdb.sql")
 	if err != nil {
 		log.Fatal("read init DB file: ", err)
 	}

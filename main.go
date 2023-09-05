@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -10,9 +11,7 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/flavio1110/rinha-de-backend/internal"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
+	"github.com/flavio1110/rinha-de-backend/internal/pessoas"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -21,22 +20,22 @@ func main() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	dbPool := setupDB()
-	defer dbPool.Close()
-	if err := dbPool.Ping(ctx); err != nil {
-		log.Fatal().Err(err).Msg("Unable to ping database")
+
+	redisClient, err := pessoas.NewRedisCache(ctx, os.Getenv("REDIS_ADDR"))
+	if err != nil {
+		log.Fatal().Err(err).Msg("configure redis")
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_ADDR"),
-		Password: "", // no password set
-		DB:       0,  // use default DB
-
-	})
-
-	if status := client.Ping(ctx); status.Err() != nil {
-		log.Fatal().Err(status.Err()).Msg("Unable to ping redis")
+	dbConfig, err := getDBConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("configure db")
 	}
+
+	store, terminateDBPool, err := pessoas.NewPessoaDBStore(dbConfig, redisClient, 10*time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("configure db store")
+	}
+	defer terminateDBPool()
 
 	isLocal := os.Getenv("LOCAL_ENV") == "true"
 	port, err := strconv.Atoi(os.Getenv("HTTP_PORT"))
@@ -44,8 +43,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("Unable to parse HTTP_PORT %q", os.Getenv("HTTP_PORT"))
 	}
 
-	store := internal.NewPessoaDBStore(dbPool, client, 10*time.Second)
-	server := internal.NewServer(port, store, isLocal)
+	server := pessoas.NewServer(port, store, isLocal)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -72,29 +70,21 @@ func main() {
 	log.Info().Msg("Server stopped")
 }
 
-func setupDB() *pgxpool.Pool {
+func getDBConfig() (pessoas.DBConfig, error) {
 	dbURL := os.Getenv("DB_URL")
 	maxConnections, err := strconv.Atoi(os.Getenv("DB_MAX_CONNECTIONS"))
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Unable to parse DB_MAX_CONNECTIONS %q", os.Getenv("DB_MAX_CONNECTIONS"))
+		return pessoas.DBConfig{}, fmt.Errorf("unable to parse DB_MAX_CONNECTIONS %q", os.Getenv("DB_MAX_CONNECTIONS"))
 	}
 
 	minConnections, err := strconv.Atoi(os.Getenv("DB_MIN_CONNECTIONS"))
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Unable to parse DB_MIN_CONNECTIONS %q", os.Getenv("DB_MAX_CONNECTIONS"))
+		return pessoas.DBConfig{}, fmt.Errorf("unable to parse DB_MIN_CONNECTIONS %q", os.Getenv("DB_MIN_CONNECTIONS"))
 	}
 
-	config, err := pgxpool.ParseConfig(dbURL)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Unable to parse config")
-	}
-	config.MinConns = int32(minConnections)
-	config.MaxConns = int32(maxConnections)
-	config.MaxConnIdleTime = time.Minute * 3
-
-	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Unable to create connection pool")
-	}
-	return dbPool
+	return pessoas.DBConfig{
+		DbURL:   dbURL,
+		MaxConn: int32(maxConnections),
+		MinConn: int32(minConnections),
+	}, nil
 }

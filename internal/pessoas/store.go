@@ -1,8 +1,7 @@
-package internal
+package pessoas
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,22 +22,46 @@ type Cache interface {
 
 type PessoaDBStore struct {
 	dbPool       *pgxpool.Pool
-	chSyncPessoa chan pessoa
 	chBulk       chan []pessoa
+	chSyncPessoa chan pessoa
 	chSignStop   chan struct{}
-	cache        Cache
 	syncInterval time.Duration
+	cache        Cache
 }
 
-func NewPessoaDBStore(dbPool *pgxpool.Pool, client *redis.Client, syncInterval time.Duration) *PessoaDBStore {
+type DBConfig struct {
+	DbURL   string
+	MaxConn int32
+	MinConn int32
+}
+
+func NewPessoaDBStore(
+	config DBConfig,
+	cache Cache,
+	syncInterval time.Duration) (*PessoaDBStore, func(), error) {
+
+	pgxConfig, err := pgxpool.ParseConfig(config.DbURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing db url: %w", err)
+	}
+
+	pgxConfig.MinConns = config.MinConn
+	pgxConfig.MaxConns = config.MaxConn
+	pgxConfig.MaxConnIdleTime = time.Minute * 3
+
+	dbPool, err := pgxpool.NewWithConfig(context.Background(), pgxConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating connection pool: %w", err)
+	}
+
 	return &PessoaDBStore{
 		dbPool:       dbPool,
 		chSignStop:   make(chan struct{}, 1),
 		chSyncPessoa: make(chan pessoa, maxBatchSize),
 		chBulk:       make(chan []pessoa, 10),
-		cache:        NewRedisCache(client),
+		cache:        cache,
 		syncInterval: syncInterval,
-	}
+	}, dbPool.Close, nil
 }
 
 func (p *PessoaDBStore) Add(ctx context.Context, pes pessoa) error {
@@ -212,44 +234,4 @@ func (p *PessoaDBStore) StopSync() {
 	time.Sleep(5 * time.Second)
 
 	close(p.chSignStop)
-}
-
-func NewRedisCache(client *redis.Client) *redisCache {
-	return &redisCache{
-		client: client,
-	}
-}
-
-type redisCache struct {
-	client *redis.Client
-}
-
-func (r redisCache) Get(ctx context.Context, key string, dest any) (bool, error) {
-	val, err := r.client.Get(ctx, key).Result()
-	if err == redis.Nil {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("getting key %s: %w", key, err)
-	}
-	if err := json.Unmarshal([]byte(val), dest); err != nil {
-		return false, fmt.Errorf("unmarshaling value: %w", err)
-	}
-
-	return true, nil
-}
-
-func (r redisCache) Add(ctx context.Context, key string, value any, expiration time.Duration) error {
-	val, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("marshaling value: %w", err)
-	}
-
-	added := r.client.SetNX(ctx, key, val, expiration).Val()
-	if !added {
-		return errors.New("value not added")
-	}
-
-	return nil
 }
