@@ -12,7 +12,7 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ./deploy/bin/rinha-backend .
 image="flavio1110/rinha-backend"
 tag="${tag:=local}"
 
-if [ "$tag" = "stable" ]
+if [ "$tag" = "stable-v2" ]
 then
   docker buildx create --use
   docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --no-cache=true -t "${image}:${tag}" --push ./deploy
