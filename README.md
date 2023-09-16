@@ -62,7 +62,7 @@ curl -v "http://localhost:9999/contagem-pessoas"
 ## Acceptance tests
 
 These tests are based on the challenge instructions and ensure the application works.
-They run against a test server without Nginx, but using a real database that are automatically started using [testconainers](https://www.testcontainers.org/).
+They run against a test server without Nginx, but using a real database that is automatically started using [testconainers](https://www.testcontainers.org/).
 
 ```
 make tests
